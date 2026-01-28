@@ -4,7 +4,7 @@ import asyncio
 import httpx
 import json
 
-DATABASE = "grocery.db"
+DATABASE = "lists.db"
 
 # ============== Database Setup ==============
 async def init_db():
@@ -410,6 +410,14 @@ footer { display: none !important; }
     .gradio-container { max-width: 100% !important; }
 }
 
+.hidden-trigger {
+    position: absolute !important;
+    left: -9999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+}
+
 input[type="checkbox"] {
     -webkit-appearance: none;
     appearance: none;
@@ -549,8 +557,117 @@ async def handle_add_parsed_items(list_id, parsed_items, selected_indices):
     return '<div class="status-msg status-error">No items selected</div>'
 
 # ============== Build App ==============
+# JavaScript for interactivity - Gradio 6.x compatible
+app_js = """
+function getGradioInput(elemId) {
+    const container = document.getElementById(elemId);
+    if (!container) {
+        console.error('Container not found:', elemId);
+        return null;
+    }
+    const input = container.querySelector('input') || container.querySelector('textarea');
+    if (!input) {
+        console.error('Input not found in container:', elemId);
+    }
+    return input;
+}
+
+function clickGradioButton(elemId) {
+    const container = document.getElementById(elemId);
+    if (!container) {
+        console.error('Button container not found:', elemId);
+        return;
+    }
+
+    // Debug: show what's in the container
+    console.log('Container innerHTML for', elemId, ':', container.innerHTML.substring(0, 200));
+
+    // Try multiple selectors - Gradio 6.x might use different structures
+    let btn = container.querySelector('button');
+    if (!btn) {
+        btn = container.querySelector('[role="button"]');
+    }
+    if (!btn) {
+        btn = container.querySelector('.gr-button');
+    }
+
+    if (btn) {
+        console.log('Clicking button:', elemId);
+        btn.click();
+    } else {
+        // Fallback: click the container itself and dispatch a click event
+        console.log('No button found, clicking container directly:', elemId);
+        container.click();
+        container.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    }
+}
+
+function setInputValue(elemId, value) {
+    const input = getGradioInput(elemId);
+    if (input) {
+        console.log('Setting input value:', elemId, '=', value);
+
+        // Simple direct assignment
+        input.value = value;
+
+        // Trigger Svelte/Gradio reactive update with InputEvent
+        const inputEvent = new InputEvent('input', {
+            bubbles: true,
+            cancelable: true,
+            inputType: 'insertText',
+            data: value
+        });
+        input.dispatchEvent(inputEvent);
+
+        // Also trigger change event
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        console.log('Input value after set:', input.value);
+    }
+}
+
+function selectList(id) {
+    console.log('selectList called with id:', id);
+    setInputValue('selected-list-id', String(id));
+    setTimeout(() => clickGradioButton('select-btn'), 200);
+}
+
+function toggleItem(id) {
+    console.log('toggleItem called with id:', id);
+    setInputValue('action-item-id', String(id));
+    setTimeout(() => clickGradioButton('toggle-btn'), 200);
+}
+
+function deleteItem(id) {
+    console.log('deleteItem called with id:', id);
+    setInputValue('action-item-id', String(id));
+    setTimeout(() => clickGradioButton('delete-btn'), 200);
+}
+
+function deleteList(id) {
+    if (confirm('Delete this list and all its items?')) {
+        console.log('deleteList confirmed with id:', id);
+        setInputValue('delete-list-id', String(id));
+        setTimeout(() => clickGradioButton('delete-list-btn'), 200);
+    }
+}
+
+function goBack() {
+    console.log('goBack called');
+    clickGradioButton('back-btn');
+}
+
+function switchTab(tab) {
+    console.log('switchTab called with tab:', tab);
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('nav-' + tab)?.classList.add('active');
+    setInputValue('tab-switch-input', tab);
+    setTimeout(() => clickGradioButton('tab-trigger'), 200);
+}
+"""
+
 def create_app():
-    with gr.Blocks(css=custom_css, title="Smart Grocery") as app:
+    with gr.Blocks(title="Lists") as app:
         # State
         current_list_id = gr.State(None)
         current_view = gr.State("lists")  # lists, single, ai
@@ -622,86 +739,20 @@ def create_app():
             add_to_list_btn = gr.Button("Add Selected Items to List", elem_classes=["action-btn"])
             add_result = gr.HTML()
 
-        # Hidden elements for JS interactions
-        selected_list_id = gr.Textbox(visible=False)
-        action_item_id = gr.Textbox(visible=False)
-        delete_list_id = gr.Textbox(visible=False)
-        tab_switch = gr.Textbox(visible=False, elem_id="tab-switch-input")
+        # Hidden elements for JS interactions (use CSS hiding so they remain in DOM)
+        # interactive=True is required for Gradio 6.x to accept programmatic value changes
+        selected_list_id = gr.Textbox(elem_id="selected-list-id", elem_classes=["hidden-trigger"], interactive=True)
+        action_item_id = gr.Textbox(elem_id="action-item-id", elem_classes=["hidden-trigger"], interactive=True)
+        delete_list_id = gr.Textbox(elem_id="delete-list-id", elem_classes=["hidden-trigger"], interactive=True)
+        tab_switch = gr.Textbox(elem_id="tab-switch-input", elem_classes=["hidden-trigger"], interactive=True)
 
-        toggle_trigger = gr.Button(visible=False, elem_id="toggle-btn")
-        delete_trigger = gr.Button(visible=False, elem_id="delete-btn")
-        select_trigger = gr.Button(visible=False, elem_id="select-btn")
-        delete_list_trigger = gr.Button(visible=False, elem_id="delete-list-btn")
-        back_trigger = gr.Button(visible=False, elem_id="back-btn")
-        tab_trigger = gr.Button(visible=False, elem_id="tab-trigger")
+        toggle_trigger = gr.Button("T", elem_id="toggle-btn", elem_classes=["hidden-trigger"])
+        delete_trigger = gr.Button("D", elem_id="delete-btn", elem_classes=["hidden-trigger"])
+        select_trigger = gr.Button("S", elem_id="select-btn", elem_classes=["hidden-trigger"])
+        delete_list_trigger = gr.Button("X", elem_id="delete-list-btn", elem_classes=["hidden-trigger"])
+        back_trigger = gr.Button("B", elem_id="back-btn", elem_classes=["hidden-trigger"])
+        tab_trigger = gr.Button("A", elem_id="tab-trigger", elem_classes=["hidden-trigger"])
 
-        # JavaScript
-        gr.HTML("""
-        <script>
-        function selectList(id) {
-            const input = document.querySelector('#component-28 textarea');
-            if (input) {
-                input.value = id;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            setTimeout(() => document.querySelector('#select-btn')?.click(), 50);
-        }
-
-        function toggleItem(id) {
-            const inputs = document.querySelectorAll('textarea');
-            for (let inp of inputs) {
-                if (inp.getBoundingClientRect().width === 0) {
-                    inp.value = id;
-                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                    break;
-                }
-            }
-            setTimeout(() => document.querySelector('#toggle-btn')?.click(), 50);
-        }
-
-        function deleteItem(id) {
-            const inputs = document.querySelectorAll('textarea');
-            for (let inp of inputs) {
-                if (inp.getBoundingClientRect().width === 0) {
-                    inp.value = id;
-                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                    break;
-                }
-            }
-            setTimeout(() => document.querySelector('#delete-btn')?.click(), 50);
-        }
-
-        function deleteList(id) {
-            if (confirm('Delete this list and all its items?')) {
-                const inputs = document.querySelectorAll('textarea');
-                for (let inp of inputs) {
-                    if (inp.getBoundingClientRect().width === 0) {
-                        inp.value = id;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        break;
-                    }
-                }
-                setTimeout(() => document.querySelector('#delete-list-btn')?.click(), 50);
-            }
-        }
-
-        function goBack() {
-            document.querySelector('#back-btn')?.click();
-        }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('nav-' + tab)?.classList.add('active');
-
-            const input = document.querySelector('#tab-switch-input textarea');
-            if (input) {
-                input.value = tab;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            setTimeout(() => document.querySelector('#tab-trigger')?.click(), 50);
-        }
-        </script>
-        """)
 
         # Tab switching handler
         def handle_tab_switch(tab, filter_type):
@@ -815,4 +866,4 @@ def create_app():
 if __name__ == "__main__":
     asyncio.run(init_db())
     app = create_app()
-    app.launch(server_port=7862, server_name="0.0.0.0", share=False, show_error=True)
+    app.launch(server_port=7862, server_name="0.0.0.0", share=False, show_error=True, css=custom_css, js=app_js)

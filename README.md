@@ -1,6 +1,6 @@
-# Smart Grocery
+# Lists
 
-A Cozi-inspired grocery and task list app with AI-powered item parsing.
+A Cozi-inspired task list app with AI-powered item parsing.
 
 ## Features
 

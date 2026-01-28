@@ -1,6 +1,6 @@
-# Smart Grocery
+# Lists
 
-Family grocery list app inspired by Cozi.
+Family list app inspired by Cozi.
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ Family grocery list app inspired by Cozi.
 ## Configuration
 
 - Port: 7862
-- Database: grocery.db
+- Database: lists.db
 
 ## Views
 
