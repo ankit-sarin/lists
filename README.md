@@ -1,6 +1,6 @@
 # Lists
 
-A Cozi-inspired task list app with AI-powered item parsing.
+A Cozi-inspired task list app with AI-powered item parsing and voice input.
 
 ## Features
 
@@ -17,7 +17,8 @@ A Cozi-inspired task list app with AI-powered item parsing.
 - Delete individual items
 - Completed items grouped at bottom
 
-**3. AI Helper**
+**3. Bruno (AI Assistant)**
+- Voice recording with Whisper transcription
 - Paste messy natural language text
 - AI extracts individual items using Ollama
 - Select which list to add parsed items to
@@ -27,6 +28,7 @@ A Cozi-inspired task list app with AI-powered item parsing.
 - **Backend**: Python with Gradio
 - **Database**: SQLite with aiosqlite (async)
 - **AI**: Ollama with qwen2.5:7b-instruct
+- **Voice**: OpenAI Whisper (base.en)
 - **Styling**: Custom CSS, mobile-friendly
 
 ## Setup
@@ -54,6 +56,17 @@ python app.py
 ```
 
 5. Open http://localhost:7862
+
+## Production Deployment
+
+A systemd service file is included for 24/7 operation:
+
+```bash
+sudo cp lists.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable lists
+sudo systemctl start lists
+```
 
 ## Screenshots
 
