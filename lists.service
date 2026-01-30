@@ -1,0 +1,15 @@
+[Unit]
+Description=Lists App - Family list app with Gradio
+After=network.target
+
+[Service]
+Type=simple
+User=ankitsarin
+WorkingDirectory=/home/ankitsarin/projects/lists
+ExecStart=/home/ankitsarin/projects/lists/venv/bin/python app.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
