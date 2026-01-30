@@ -3,6 +3,12 @@ import aiosqlite
 import asyncio
 import httpx
 import json
+import whisper
+
+# Load Whisper model for speech recognition
+print("Loading Whisper model...")
+whisper_model = whisper.load_model("base.en", device="cpu")
+print("Whisper model loaded!")
 
 DATABASE = "lists.db"
 
@@ -167,6 +173,26 @@ Your response (JSON array only):"""
     if not fallback_items:
         fallback_items = [text.strip()]
     return fallback_items
+
+# ============== Audio Transcription ==============
+def transcribe_audio(audio_path):
+    """Transcribe audio file using Whisper model."""
+    if audio_path is None:
+        return "", '<div class="status-msg status-error">No audio recorded.</div>'
+
+    print(f"Transcribing file: {audio_path}")
+    try:
+        result = whisper_model.transcribe(audio_path)
+        text = result["text"].strip()
+        print(f"Transcription result: {text}")
+
+        if text:
+            return text, '<div class="status-msg status-success">✓ Transcription complete!</div>'
+        else:
+            return "", '<div class="status-msg status-error">No speech detected.</div>'
+    except Exception as e:
+        print(f"Error: {e}")
+        return "", f'<div class="status-msg status-error">Error: {str(e)}</div>'
 
 # ============== HTML Generators ==============
 def generate_all_lists_html(lists, items_dict):
@@ -686,7 +712,7 @@ def create_app():
         gr.HTML("""
         <div class="nav-tabs">
             <div class="nav-tab active" id="nav-lists" onclick="switchTab('lists')">📋 Lists</div>
-            <div class="nav-tab" id="nav-ai" onclick="switchTab('ai')">🤖 AI Helper</div>
+            <div class="nav-tab" id="nav-ai" onclick="switchTab('ai')">🤖 Bruno</div>
         </div>
         """)
 
@@ -714,16 +740,25 @@ def create_app():
             single_list_html = gr.HTML()
             back_btn = gr.Button("← Back to Lists", elem_classes=["action-btn", "secondary-btn"])
 
-        # ========== VIEW 3: AI Helper ==========
+        # ========== VIEW 3: Bruno ==========
         with gr.Column(visible=False) as ai_helper_view:
             gr.HTML('''
             <div class="ai-input-area">
-                <h3 style="color: #0097A7; margin: 0 0 8px 0;">🤖 AI Item Parser</h3>
+                <h3 style="color: #0097A7; margin: 0 0 8px 0;">🤖 Bruno</h3>
                 <p style="color: #666; font-size: 14px; margin: 0;">
                     Type or paste your messy shopping list and let AI extract the items for you!
                 </p>
             </div>
             ''')
+
+            with gr.Row():
+                audio_input = gr.Audio(
+                    sources=["microphone"],
+                    type="filepath",
+                    label="🎤 Record your list"
+                )
+            transcribe_btn = gr.Button("🎤 Transcribe Recording", elem_classes=["action-btn", "secondary-btn"])
+            transcribe_status = gr.HTML()
 
             ai_text_input = gr.Textbox(
                 placeholder="e.g., need milk eggs and oh yeah we're out of bread also bananas for smoothies...",
@@ -768,7 +803,7 @@ def create_app():
                     gr.update(visible=False),
                     gr.update(visible=False),
                     gr.update(visible=True),
-                    make_header("AI Helper")
+                    make_header("Bruno")
                 )
             return gr.update(), gr.update(), gr.update(), gr.update()
 
@@ -835,7 +870,14 @@ def create_app():
         toggle_trigger.click(fn=handle_toggle_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
         delete_trigger.click(fn=handle_delete_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
 
-        # AI Helper handlers
+        # Bruno handlers
+        # Audio transcription - button click to transcribe
+        transcribe_btn.click(
+            fn=transcribe_audio,
+            inputs=[audio_input],
+            outputs=[ai_text_input, transcribe_status]
+        )
+
         async def parse_and_store(text):
             html, items, status = await handle_parse_items(text)
             return html, items, status
