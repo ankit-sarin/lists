@@ -22,7 +22,7 @@ A Cozi-inspired family list app with AI-powered item parsing, voice input, and i
 - Paste messy natural language text
 - AI extracts individual items using Ollama (qwen2.5:7b-instruct)
 - Checkbox preview to select items
-- Add to existing list or create a new one
+- Choose destination list (existing or new) as final step
 
 **4. Smart Scan (Vision AI)**
 - Upload photos of recipes, handwritten notes, whiteboards, or screenshots
