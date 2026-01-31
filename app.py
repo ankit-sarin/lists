@@ -4,6 +4,7 @@ import asyncio
 import httpx
 import json
 import whisper
+import base64
 
 # Load Whisper model for speech recognition
 print("Loading Whisper model...")
@@ -71,6 +72,13 @@ async def get_lists(list_type=None):
             cursor = await db.execute("SELECT * FROM lists WHERE list_type = ? ORDER BY created_at DESC", (list_type,))
         else:
             cursor = await db.execute("SELECT * FROM lists ORDER BY created_at DESC")
+        return await cursor.fetchall()
+
+async def get_lists_by_type(list_type):
+    """Get lists filtered by type for Smart Scan dropdown."""
+    async with aiosqlite.connect(DATABASE) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM lists WHERE list_type = ? ORDER BY created_at DESC", (list_type,))
         return await cursor.fetchall()
 
 async def get_list_by_id(list_id):
@@ -174,6 +182,57 @@ Your response (JSON array only):"""
         fallback_items = [text.strip()]
     return fallback_items
 
+# ============== Vision Model Integration ==============
+async def extract_items_from_image(image_path, list_type):
+    """Use Ollama vision model to extract items from an image."""
+    if image_path is None:
+        return []
+
+    # Read and encode image as base64
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+
+    # Craft prompt based on list type
+    type_prompts = {
+        "Shopping": "Look at this image carefully. Extract all shopping items, ingredients, groceries, or things to buy. This could be a recipe, handwritten note, whiteboard, screenshot, or any image containing items to purchase.",
+        "To Do": "Look at this image carefully. Extract all tasks, to-do items, action items, or things that need to be done. This could be a handwritten note, whiteboard, screenshot, or any image containing tasks.",
+        "Chores": "Look at this image carefully. Extract all chores, cleaning tasks, household tasks, or maintenance items. This could be a handwritten note, whiteboard, screenshot, or any image containing chores."
+    }
+
+    prompt = f"""{type_prompts.get(list_type, type_prompts["Shopping"])}
+
+Return ONLY a JSON array of strings with each item, nothing else. Clean up the text (proper capitalization). If quantities are mentioned, include them.
+
+Example output: ["Milk", "2 dozen eggs", "Bread", "Butter"]
+
+Your response (JSON array only):"""
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "qwen3-vl:8b",
+                    "prompt": prompt,
+                    "images": [image_data],
+                    "stream": False
+                }
+            )
+            if response.status_code == 200:
+                result = response.json().get("response", "").strip()
+                print(f"Vision model response: {result[:500]}")
+                # Try to extract JSON array from response
+                start = result.find("[")
+                end = result.rfind("]") + 1
+                if start != -1 and end > start:
+                    json_str = result[start:end]
+                    items = json.loads(json_str)
+                    return [str(item).strip() for item in items if item]
+    except Exception as e:
+        print(f"Vision model error: {e}")
+
+    return []
+
 # ============== Audio Transcription ==============
 def transcribe_audio(audio_path):
     """Transcribe audio file using Whisper model."""
@@ -193,6 +252,25 @@ def transcribe_audio(audio_path):
     except Exception as e:
         print(f"Error: {e}")
         return "", f'<div class="status-msg status-error">Error: {str(e)}</div>'
+
+def smart_split_text(text):
+    """Split text by commas, 'and', and newlines into individual items."""
+    import re
+    # First split by newlines
+    lines = text.strip().split('\n')
+    items = []
+    filler_pattern = re.compile(r'^(also|oh yeah|we need|need|get|buy|grab|the)\s+', re.IGNORECASE)
+    for line in lines:
+        # Split by comma or ' and ' (with spaces to avoid splitting 'sand', 'band', etc.)
+        parts = re.split(r',|\s+and\s+', line, flags=re.IGNORECASE)
+        for part in parts:
+            cleaned = part.strip()
+            # Remove common filler words at the start (loop to handle chained fillers)
+            while filler_pattern.match(cleaned):
+                cleaned = filler_pattern.sub('', cleaned)
+            if cleaned and len(cleaned) > 1:  # Skip empty or single-char items
+                items.append(cleaned)
+    return items
 
 # ============== HTML Generators ==============
 def generate_all_lists_html(lists, items_dict):
@@ -303,6 +381,22 @@ def generate_parsed_items_html(items):
             <input type="checkbox" id="parsed-{i}" checked class="parsed-item-cb" data-item="{item}"
                 style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer;">
             <label for="parsed-{i}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item}</label>
+        </div>'''
+    html += '</div>'
+    return html
+
+def generate_scanned_items_html(items):
+    """Generate HTML for scanned items from Smart Scan."""
+    if not items:
+        return '<div style="color: #999; padding: 20px; text-align: center;">No items extracted yet. Upload an image and click "Extract Items".</div>'
+
+    html = '<div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">'
+    for i, item in enumerate(items):
+        html += f'''
+        <div style="display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f0f0;">
+            <input type="checkbox" id="scanned-{i}" checked class="scanned-item-cb" data-item="{item}"
+                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer;">
+            <label for="scanned-{i}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item}</label>
         </div>'''
     html += '</div>'
     return html
@@ -479,10 +573,15 @@ input[type="checkbox"]:checked::after {
 }
 
 .status-msg {
+    min-height: 50px;
     padding: 12px 16px;
     border-radius: 8px;
     margin: 8px 0;
     font-size: 14px;
+}
+
+.transcribe-status-container {
+    min-height: 50px;
 }
 
 .status-success { background: #e8f5e9; color: #2e7d32; }
@@ -569,18 +668,100 @@ async def handle_parse_items(text):
         return html, items, status
     return "", [], '<div class="status-msg status-error">Could not parse any items</div>'
 
-async def handle_add_parsed_items(list_id, parsed_items, selected_indices):
-    if not list_id:
-        return '<div class="status-msg status-error">Please select a list first</div>'
+async def handle_add_parsed_items(list_id, parsed_items, selected_indices, new_list_name, new_list_type):
     if not parsed_items:
-        return '<div class="status-msg status-error">No items to add</div>'
+        return '<div class="status-msg status-error">No items to add</div>', gr.update()
+
+    # Determine target list - create new one if name provided
+    target_list_id = list_id
+    list_name = ""
+    if new_list_name and new_list_name.strip():
+        target_list_id = await create_list(new_list_name.strip(), new_list_type)
+        list_name = new_list_name.strip()
+    elif not list_id:
+        return '<div class="status-msg status-error">Please select a list or enter a new list name</div>', gr.update()
 
     # Add all parsed items (in real app, would filter by checkboxes)
     items_to_add = parsed_items if isinstance(parsed_items, list) else []
     if items_to_add:
-        await add_items_bulk(int(list_id), items_to_add)
-        return f'<div class="status-msg status-success">Added {len(items_to_add)} items to your list!</div>'
-    return '<div class="status-msg status-error">No items selected</div>'
+        await add_items_bulk(int(target_list_id), items_to_add)
+        # Refresh the dropdown choices
+        choices = await get_list_choices()
+        if list_name:
+            return f'<div class="status-msg status-success">Created "{list_name}" and added {len(items_to_add)} items!</div>', gr.update(choices=choices)
+        return f'<div class="status-msg status-success">Added {len(items_to_add)} items to your list!</div>', gr.update(choices=choices)
+    return '<div class="status-msg status-error">No items selected</div>', gr.update()
+
+async def handle_add_direct(text, list_id, new_list_name, new_list_type):
+    """Add items directly to list using smart split (no AI parsing)."""
+    if not text.strip():
+        return '<div class="status-msg status-error">Please enter or transcribe some text first</div>', gr.update()
+
+    items = smart_split_text(text)
+    if not items:
+        return '<div class="status-msg status-error">No items found in text</div>', gr.update()
+
+    # Determine target list - create new one if name provided
+    target_list_id = list_id
+    list_name = ""
+    if new_list_name and new_list_name.strip():
+        target_list_id = await create_list(new_list_name.strip(), new_list_type)
+        list_name = new_list_name.strip()
+    elif not list_id:
+        return '<div class="status-msg status-error">Please select a list or enter a new list name</div>', gr.update()
+
+    await add_items_bulk(int(target_list_id), items)
+    items_preview = ", ".join(items[:3])
+    if len(items) > 3:
+        items_preview += f" (+{len(items) - 3} more)"
+
+    # Refresh the dropdown choices
+    choices = await get_list_choices()
+    if list_name:
+        return f'<div class="status-msg status-success">Created "{list_name}" and added {len(items)} items: {items_preview}</div>', gr.update(choices=choices)
+    return f'<div class="status-msg status-success">Added {len(items)} items: {items_preview}</div>', gr.update(choices=choices)
+
+# ============== Smart Scan Handlers ==============
+async def handle_extract_from_image(image_path, list_type):
+    """Extract items from uploaded image using vision model."""
+    if image_path is None:
+        return "", [], '<div class="status-msg status-error">Please upload an image first</div>'
+
+    items = await extract_items_from_image(image_path, list_type)
+    if items:
+        html = generate_scanned_items_html(items)
+        status = f'<div class="status-msg status-success">Found {len(items)} items! Select the ones you want to add.</div>'
+        return html, items, status
+    return "", [], '<div class="status-msg status-error">Could not extract any items from the image. Try a clearer image or different list type.</div>'
+
+async def get_lists_for_type(list_type):
+    """Get list choices filtered by type."""
+    lists = await get_lists_by_type(list_type)
+    return [(lst['name'], lst['id']) for lst in lists]
+
+async def handle_add_scanned_items(list_id, scanned_items, new_list_name, list_type):
+    """Add scanned items to selected list or create new list."""
+    if not scanned_items:
+        return '<div class="status-msg status-error">No items to add. Extract items from an image first.</div>', gr.update()
+
+    # Determine target list - create new one if name provided
+    target_list_id = list_id
+    created_list_name = ""
+    if new_list_name and new_list_name.strip():
+        target_list_id = await create_list(new_list_name.strip(), list_type)
+        created_list_name = new_list_name.strip()
+    elif not list_id:
+        return '<div class="status-msg status-error">Please select a list or enter a new list name</div>', gr.update()
+
+    items_to_add = scanned_items if isinstance(scanned_items, list) else []
+    if items_to_add:
+        await add_items_bulk(int(target_list_id), items_to_add)
+        # Refresh the dropdown choices
+        choices = await get_lists_for_type(list_type)
+        if created_list_name:
+            return f'<div class="status-msg status-success">Created "{created_list_name}" and added {len(items_to_add)} items!</div>', gr.update(choices=choices)
+        return f'<div class="status-msg status-success">Added {len(items_to_add)} items to your list!</div>', gr.update(choices=choices)
+    return '<div class="status-msg status-error">No items selected</div>', gr.update()
 
 # ============== Build App ==============
 # JavaScript for interactivity - Gradio 6.x compatible
@@ -713,6 +894,7 @@ def create_app():
         <div class="nav-tabs">
             <div class="nav-tab active" id="nav-lists" onclick="switchTab('lists')">📋 Lists</div>
             <div class="nav-tab" id="nav-ai" onclick="switchTab('ai')">🤖 Bruno</div>
+            <div class="nav-tab" id="nav-scan" onclick="switchTab('scan')">📷 Smart Scan</div>
         </div>
         """)
 
@@ -758,21 +940,68 @@ def create_app():
                     label="🎤 Record your list"
                 )
             transcribe_btn = gr.Button("🎤 Transcribe Recording", elem_classes=["action-btn", "secondary-btn"])
-            transcribe_status = gr.HTML()
+            transcribe_status = gr.HTML(elem_classes=["transcribe-status-container"])
 
             ai_text_input = gr.Textbox(
                 placeholder="e.g., need milk eggs and oh yeah we're out of bread also bananas for smoothies...",
                 label="Your messy list",
                 lines=4
             )
-            parse_btn = gr.Button("🔍 Parse Items", elem_classes=["action-btn"])
+
+            ai_list_dropdown = gr.Dropdown(label="Add to existing list", choices=[], interactive=True)
+
+            gr.HTML('<div style="color: #666; font-size: 13px; text-align: center; padding: 8px 0;">— or create a new list —</div>')
+            with gr.Row():
+                ai_new_list_name = gr.Textbox(placeholder="New list name...", label="", container=False, scale=2)
+                ai_new_list_type = gr.Dropdown(choices=["Shopping", "To Do", "Chores"], value="Shopping", label="", container=False, scale=1)
+
+            with gr.Row():
+                parse_btn = gr.Button("🔍 Parse with AI", elem_classes=["action-btn"], scale=1)
+                add_direct_btn = gr.Button("➕ Add Directly", elem_classes=["action-btn", "secondary-btn"], scale=1)
 
             ai_status = gr.HTML()
             parsed_items_html = gr.HTML()
 
-            ai_list_dropdown = gr.Dropdown(label="Add to list", choices=[], interactive=True)
             add_to_list_btn = gr.Button("Add Selected Items to List", elem_classes=["action-btn"])
             add_result = gr.HTML()
+
+        # ========== VIEW 4: Smart Scan ==========
+        with gr.Column(visible=False) as smart_scan_view:
+            gr.HTML('''
+            <div class="ai-input-area">
+                <h3 style="color: #0097A7; margin: 0 0 8px 0;">📷 Smart Scan</h3>
+                <p style="color: #666; font-size: 14px; margin: 0;">
+                    Upload a photo of a recipe, handwritten note, whiteboard, or screenshot and extract items automatically!
+                </p>
+            </div>
+            ''')
+
+            scan_image = gr.Image(
+                sources=["upload", "clipboard"],
+                type="filepath",
+                label="Upload Image",
+                height=200
+            )
+
+            scan_list_type = gr.Radio(
+                choices=["Shopping", "To Do", "Chores"],
+                value="Shopping",
+                label="What type of items to extract?"
+            )
+
+            extract_btn = gr.Button("🔍 Extract Items", elem_classes=["action-btn"])
+            scan_status = gr.HTML()
+
+            scanned_items_state = gr.State([])
+            scanned_items_html = gr.HTML()
+
+            scan_target_list = gr.Dropdown(label="Add to existing list", choices=[], interactive=True)
+
+            gr.HTML('<div style="color: #666; font-size: 13px; text-align: center; padding: 8px 0;">— or create a new list —</div>')
+            scan_new_list_name = gr.Textbox(placeholder="New list name...", label="", container=False)
+
+            add_scanned_btn = gr.Button("Add Selected Items to List", elem_classes=["action-btn"])
+            scan_result = gr.HTML()
 
         # Hidden elements for JS interactions (use CSS hiding so they remain in DOM)
         # interactive=True is required for Gradio 6.x to accept programmatic value changes
@@ -796,6 +1025,7 @@ def create_app():
                     gr.update(visible=True),
                     gr.update(visible=False),
                     gr.update(visible=False),
+                    gr.update(visible=False),
                     make_header("Lists")
                 )
             elif tab == "ai":
@@ -803,14 +1033,23 @@ def create_app():
                     gr.update(visible=False),
                     gr.update(visible=False),
                     gr.update(visible=True),
+                    gr.update(visible=False),
                     make_header("Bruno")
                 )
-            return gr.update(), gr.update(), gr.update(), gr.update()
+            elif tab == "scan":
+                return (
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    make_header("Smart Scan")
+                )
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
 
         tab_trigger.click(
             fn=handle_tab_switch,
             inputs=[tab_switch, filter_type],
-            outputs=[all_lists_view, single_list_view, ai_helper_view, header_html]
+            outputs=[all_lists_view, single_list_view, ai_helper_view, smart_scan_view, header_html]
         )
 
         # Event bindings
@@ -875,7 +1114,8 @@ def create_app():
         transcribe_btn.click(
             fn=transcribe_audio,
             inputs=[audio_input],
-            outputs=[ai_text_input, transcribe_status]
+            outputs=[ai_text_input, transcribe_status],
+            scroll_to_output=False
         )
 
         async def parse_and_store(text):
@@ -888,19 +1128,57 @@ def create_app():
             outputs=[parsed_items_html, parsed_items_state, ai_status]
         )
 
+        add_direct_btn.click(
+            fn=handle_add_direct,
+            inputs=[ai_text_input, ai_list_dropdown, ai_new_list_name, ai_new_list_type],
+            outputs=[ai_status, ai_list_dropdown],
+            scroll_to_output=False
+        )
+
         add_to_list_btn.click(
             fn=handle_add_parsed_items,
-            inputs=[ai_list_dropdown, parsed_items_state, gr.State([])],
-            outputs=[add_result]
+            inputs=[ai_list_dropdown, parsed_items_state, gr.State([]), ai_new_list_name, ai_new_list_type],
+            outputs=[add_result, ai_list_dropdown]
+        )
+
+        # Smart Scan handlers
+        async def extract_and_store(image_path, list_type):
+            html, items, status = await handle_extract_from_image(image_path, list_type)
+            # Also update the target list dropdown based on selected type
+            choices = await get_lists_for_type(list_type)
+            return html, items, status, gr.update(choices=choices)
+
+        extract_btn.click(
+            fn=extract_and_store,
+            inputs=[scan_image, scan_list_type],
+            outputs=[scanned_items_html, scanned_items_state, scan_status, scan_target_list]
+        )
+
+        # Update target list dropdown when list type changes
+        async def update_target_lists(list_type):
+            choices = await get_lists_for_type(list_type)
+            return gr.update(choices=choices)
+
+        scan_list_type.change(
+            fn=update_target_lists,
+            inputs=[scan_list_type],
+            outputs=[scan_target_list]
+        )
+
+        add_scanned_btn.click(
+            fn=handle_add_scanned_items,
+            inputs=[scan_target_list, scanned_items_state, scan_new_list_name, scan_list_type],
+            outputs=[scan_result, scan_target_list]
         )
 
         # Initial load
-        async def init_load(filter_type):
+        async def init_load(filter_type, scan_type):
             html = await load_all_lists(filter_type)
             choices = await get_list_choices()
-            return html, gr.update(choices=choices)
+            scan_choices = await get_lists_for_type(scan_type)
+            return html, gr.update(choices=choices), gr.update(choices=scan_choices)
 
-        app.load(fn=init_load, inputs=[filter_type], outputs=[all_lists_html, ai_list_dropdown])
+        app.load(fn=init_load, inputs=[filter_type, scan_list_type], outputs=[all_lists_html, ai_list_dropdown, scan_target_list])
 
     return app
 
