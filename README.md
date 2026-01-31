@@ -1,10 +1,10 @@
 # Lists
 
-A Cozi-inspired task list app with AI-powered item parsing and voice input.
+A Cozi-inspired family list app with AI-powered item parsing, voice input, and image scanning.
 
 ## Features
 
-### Three Views
+### Four Views
 
 **1. All Lists View**
 - Filter by type: Shopping, To Do, Chores
@@ -20,14 +20,23 @@ A Cozi-inspired task list app with AI-powered item parsing and voice input.
 **3. Bruno (AI Assistant)**
 - Voice recording with Whisper transcription
 - Paste messy natural language text
-- AI extracts individual items using Ollama
-- Select which list to add parsed items to
+- AI extracts individual items using Ollama (qwen2.5:7b-instruct)
+- Checkbox preview to select items
+- Add to existing list or create a new one
+
+**4. Smart Scan (Vision AI)**
+- Upload photos of recipes, handwritten notes, whiteboards, or screenshots
+- Select item type to extract (Shopping, To Do, or Chores)
+- Vision AI extracts items using Ollama (qwen3-vl:8b)
+- Checkbox preview to select items
+- Add to existing list or create a new one
 
 ## Tech Stack
 
 - **Backend**: Python with Gradio
 - **Database**: SQLite with aiosqlite (async)
-- **AI**: Ollama with qwen2.5:7b-instruct
+- **AI (Text)**: Ollama with qwen2.5:7b-instruct
+- **AI (Vision)**: Ollama with qwen3-vl:8b
 - **Voice**: OpenAI Whisper (base.en)
 - **Styling**: Custom CSS, mobile-friendly
 
@@ -44,10 +53,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. (Optional) Install Ollama for AI features:
+3. Install Ollama models for AI features:
 ```bash
 # Install Ollama from https://ollama.ai
-ollama pull qwen2.5:7b-instruct
+ollama pull qwen2.5:7b-instruct  # For Bruno text parsing
+ollama pull qwen3-vl:8b          # For Smart Scan image extraction
 ```
 
 4. Run the app:

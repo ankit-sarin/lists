@@ -15,13 +15,14 @@ Family list app inspired by Cozi.
 - Port: 7862
 - Database: lists.db
 - Service: lists.service (systemd)
+- Ollama endpoint: localhost:11434
 
 ## Views
 
 1. **All Lists** - Filter tabs (Shopping/To Do/Chores), list cards with previews, create/delete lists
 2. **Single List** - Add items, checkboxes with strikethrough, delete items, back navigation
-3. **Bruno** - Voice recording with Whisper transcription, natural language input, Ollama parsing, bulk add to selected list
-4. **Smart Scan** - Upload images (recipes, handwritten notes, whiteboards, screenshots), vision model extraction with qwen3-vl:8b, checkbox preview, add to list filtered by type
+3. **Bruno** - Voice recording with Whisper transcription, natural language input, Ollama parsing, checkbox preview, add to existing or new list
+4. **Smart Scan** - Upload images (recipes, handwritten notes, whiteboards, screenshots), vision model extraction with qwen3-vl:8b, checkbox preview, add to existing or new list (filtered by type)
 
 ## Database Schema
 
