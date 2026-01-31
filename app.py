@@ -692,34 +692,18 @@ async def handle_add_parsed_items(list_id, parsed_items, selected_indices, new_l
         return f'<div class="status-msg status-success">Added {len(items_to_add)} items to your list!</div>', gr.update(choices=choices)
     return '<div class="status-msg status-error">No items selected</div>', gr.update()
 
-async def handle_add_direct(text, list_id, new_list_name, new_list_type):
-    """Add items directly to list using smart split (no AI parsing)."""
+async def handle_direct_parse(text):
+    """Parse items directly using smart split (no AI) and show preview."""
     if not text.strip():
-        return '<div class="status-msg status-error">Please enter or transcribe some text first</div>', gr.update()
+        return "", [], '<div class="status-msg status-error">Please enter or transcribe some text first</div>'
 
     items = smart_split_text(text)
     if not items:
-        return '<div class="status-msg status-error">No items found in text</div>', gr.update()
+        return "", [], '<div class="status-msg status-error">No items found in text</div>'
 
-    # Determine target list - create new one if name provided
-    target_list_id = list_id
-    list_name = ""
-    if new_list_name and new_list_name.strip():
-        target_list_id = await create_list(new_list_name.strip(), new_list_type)
-        list_name = new_list_name.strip()
-    elif not list_id:
-        return '<div class="status-msg status-error">Please select a list or enter a new list name</div>', gr.update()
-
-    await add_items_bulk(int(target_list_id), items)
-    items_preview = ", ".join(items[:3])
-    if len(items) > 3:
-        items_preview += f" (+{len(items) - 3} more)"
-
-    # Refresh the dropdown choices
-    choices = await get_list_choices()
-    if list_name:
-        return f'<div class="status-msg status-success">Created "{list_name}" and added {len(items)} items: {items_preview}</div>', gr.update(choices=choices)
-    return f'<div class="status-msg status-success">Added {len(items)} items: {items_preview}</div>', gr.update(choices=choices)
+    html = generate_parsed_items_html(items)
+    status = f'<div class="status-msg status-success">Found {len(items)} items! Select the ones you want to add.</div>'
+    return html, items, status
 
 # ============== Smart Scan Handlers ==============
 async def handle_extract_from_image(image_path, list_type):
@@ -948,19 +932,21 @@ def create_app():
                 lines=4
             )
 
-            ai_list_dropdown = gr.Dropdown(label="Add to existing list", choices=[], interactive=True)
-
-            gr.HTML('<div style="color: #666; font-size: 13px; text-align: center; padding: 8px 0;">— or create a new list —</div>')
-            with gr.Row():
-                ai_new_list_name = gr.Textbox(placeholder="New list name...", label="", container=False, scale=2)
-                ai_new_list_type = gr.Dropdown(choices=["Shopping", "To Do", "Chores"], value="Shopping", label="", container=False, scale=1)
-
             with gr.Row():
                 parse_btn = gr.Button("🔍 Parse with AI", elem_classes=["action-btn"], scale=1)
                 add_direct_btn = gr.Button("➕ Add Directly", elem_classes=["action-btn", "secondary-btn"], scale=1)
 
             ai_status = gr.HTML()
             parsed_items_html = gr.HTML()
+
+            # List selection - shown after parsing
+            gr.HTML('<div style="padding: 16px 0 8px 0; font-weight: 600; color: #333;">Add items to:</div>')
+            ai_list_dropdown = gr.Dropdown(label="Existing list", choices=[], interactive=True)
+
+            gr.HTML('<div style="color: #666; font-size: 13px; text-align: center; padding: 8px 0;">— or create a new list —</div>')
+            with gr.Row():
+                ai_new_list_name = gr.Textbox(placeholder="New list name...", label="", container=False, scale=2)
+                ai_new_list_type = gr.Dropdown(choices=["Shopping", "To Do", "Chores"], value="Shopping", label="", container=False, scale=1)
 
             add_to_list_btn = gr.Button("Add Selected Items to List", elem_classes=["action-btn"])
             add_result = gr.HTML()
@@ -1129,10 +1115,9 @@ def create_app():
         )
 
         add_direct_btn.click(
-            fn=handle_add_direct,
-            inputs=[ai_text_input, ai_list_dropdown, ai_new_list_name, ai_new_list_type],
-            outputs=[ai_status, ai_list_dropdown],
-            scroll_to_output=False
+            fn=handle_direct_parse,
+            inputs=[ai_text_input],
+            outputs=[parsed_items_html, parsed_items_state, ai_status]
         )
 
         add_to_list_btn.click(
