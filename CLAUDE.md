@@ -16,6 +16,7 @@ Family list app inspired by Cozi.
 - Database: lists.db
 - Service: lists.service (systemd)
 - Ollama endpoint: localhost:11434
+- Brand CSS: gradio-theme.css (Digital Surgeon theme, loaded and appended to custom_css in gr.Blocks)
 
 ## Views
 

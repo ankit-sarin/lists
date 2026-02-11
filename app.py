@@ -5,6 +5,7 @@ import httpx
 import json
 import whisper
 import base64
+import os
 
 # Load Whisper model for speech recognition
 print("Loading Whisper model...")
@@ -857,8 +858,12 @@ function switchTab(tab) {
 }
 """
 
+_css_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gradio-theme.css")
+with open(_css_path, "r") as f:
+    brand_css = f.read()
+
 def create_app():
-    with gr.Blocks(title="Lists") as app:
+    with gr.Blocks(title="Lists", css=custom_css + brand_css) as app:
         # State
         current_list_id = gr.State(None)
         current_view = gr.State("lists")  # lists, single, ai
@@ -1171,4 +1176,4 @@ def create_app():
 if __name__ == "__main__":
     asyncio.run(init_db())
     app = create_app()
-    app.launch(server_port=7862, server_name="0.0.0.0", share=False, show_error=True, css=custom_css, js=app_js)
+    app.launch(server_port=7862, server_name="0.0.0.0", share=False, show_error=True, js=app_js)
