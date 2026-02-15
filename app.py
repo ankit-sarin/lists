@@ -6,6 +6,7 @@ import json
 import whisper
 import base64
 import os
+import uuid
 
 # Load Whisper model for speech recognition
 print("Loading Whisper model...")
@@ -131,6 +132,11 @@ async def toggle_item(item_id):
 async def delete_item(item_id):
     async with aiosqlite.connect(DATABASE) as db:
         await db.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        await db.commit()
+
+async def delete_completed_items(list_id):
+    async with aiosqlite.connect(DATABASE) as db:
+        await db.execute("DELETE FROM items WHERE list_id = ? AND purchased = 1", (list_id,))
         await db.commit()
 
 # ============== Ollama AI Integration ==============
@@ -349,8 +355,14 @@ def generate_single_list_html(list_info, items):
         </div>'''
 
     if purchased:
-        items_html += f'''<div style="padding: 12px 16px; background: #f9f9f9; color: #999; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">
-            Completed ({len(purchased)})
+        items_html += f'''<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f9f9f9;">
+            <span style="color: #999; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Completed ({len(purchased)})</span>
+            <button onclick="deleteCompleted()"
+                style="background: none; border: 1px solid #ccc; color: #999; font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer;"
+                onmouseover="this.style.borderColor='#f44336'; this.style.color='#f44336'"
+                onmouseout="this.style.borderColor='#ccc'; this.style.color='#999'">
+                Clear all
+            </button>
         </div>'''
         for item in purchased:
             items_html += f'''
@@ -369,7 +381,8 @@ def generate_single_list_html(list_info, items):
             <p style="font-size: 14px;">Add your first item above!</p>
         </div>'''
 
-    return f'''<div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">{items_html}</div>'''
+    render_id = uuid.uuid4().hex[:8]
+    return f'''<div id="list-render-{render_id}" style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">{items_html}</div>'''
 
 def generate_parsed_items_html(items):
     if not items:
@@ -659,6 +672,14 @@ async def handle_delete_item(item_id, list_id):
         return generate_single_list_html(list_info, items)
     return ""
 
+async def handle_delete_completed(list_id):
+    if list_id:
+        await delete_completed_items(int(list_id))
+        list_info = await get_list_by_id(int(list_id))
+        items = await get_list_items(int(list_id))
+        return generate_single_list_html(list_info, items)
+    return ""
+
 async def handle_parse_items(text):
     if not text.strip():
         return "", [], '<div class="status-msg status-error">Please enter some text to parse</div>'
@@ -844,6 +865,13 @@ function deleteList(id) {
     }
 }
 
+function deleteCompleted() {
+    if (confirm('Delete all completed items?')) {
+        console.log('deleteCompleted called');
+        clickGradioButton('delete-completed-btn');
+    }
+}
+
 function goBack() {
     console.log('goBack called');
     clickGradioButton('back-btn');
@@ -1007,6 +1035,7 @@ def create_app():
         delete_list_trigger = gr.Button("X", elem_id="delete-list-btn", elem_classes=["hidden-trigger"])
         back_trigger = gr.Button("B", elem_id="back-btn", elem_classes=["hidden-trigger"])
         tab_trigger = gr.Button("A", elem_id="tab-trigger", elem_classes=["hidden-trigger"])
+        delete_completed_trigger = gr.Button("DC", elem_id="delete-completed-btn", elem_classes=["hidden-trigger"])
 
 
         # Tab switching handler
@@ -1099,6 +1128,7 @@ def create_app():
 
         toggle_trigger.click(fn=handle_toggle_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
         delete_trigger.click(fn=handle_delete_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
+        delete_completed_trigger.click(fn=handle_delete_completed, inputs=[current_list_id], outputs=[single_list_html])
 
         # Bruno handlers
         # Audio transcription - button click to transcribe
