@@ -341,6 +341,7 @@ def generate_single_list_html(list_info, items):
     if not list_info:
         return ""
 
+    render_id = uuid.uuid4().hex[:8]
     items_html = ""
     unpurchased = [i for i in items if not i['purchased']]
     purchased = [i for i in items if i['purchased']]
@@ -348,30 +349,31 @@ def generate_single_list_html(list_info, items):
     for item in unpurchased:
         items_html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid #f0f0f0;">
-            <input type="checkbox" id="item-{item['id']}" onchange="toggleItem({item['id']})"
-                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer; flex-shrink: 0;">
-            <label for="item-{item['id']}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item['name']}</label>
+            <div onclick="toggleItem({item['id']})" class="fake-checkbox"></div>
+            <span style="flex: 1; color: #333; font-size: 16px;">{item['name']}</span>
             <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
         </div>'''
 
     if purchased:
         items_html += f'''<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f9f9f9;">
             <span style="color: #999; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Completed ({len(purchased)})</span>
-            <button onclick="deleteCompleted()"
-                style="background: none; border: 1px solid #ccc; color: #999; font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer;"
-                onmouseover="this.style.borderColor='#f44336'; this.style.color='#f44336'"
-                onmouseout="this.style.borderColor='#ccc'; this.style.color='#999'">
-                Clear all
-            </button>
         </div>'''
         for item in purchased:
             items_html += f'''
             <div style="display: flex; align-items: center; padding: 14px 16px; background: #fafafa; border-bottom: 1px solid #f0f0f0;">
-                <input type="checkbox" id="item-{item['id']}" checked onchange="toggleItem({item['id']})"
-                    style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer; flex-shrink: 0;">
-                <label for="item-{item['id']}" style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through; cursor: pointer;">{item['name']}</label>
+                <div onclick="toggleItem({item['id']})" class="fake-checkbox checked"></div>
+                <span style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through;">{item['name']}</span>
                 <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
             </div>'''
+        items_html += f'''
+        <div style="padding: 12px 16px; background: #fafafa;">
+            <button onclick="deleteCompleted()"
+                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 500; padding: 10px; border-radius: 8px; cursor: pointer;"
+                onmouseover="this.style.background='#ffebee'"
+                onmouseout="this.style.background='none'">
+                Clear all completed ({len(purchased)})
+            </button>
+        </div>'''
 
     if not items:
         items_html = '''
@@ -381,7 +383,6 @@ def generate_single_list_html(list_info, items):
             <p style="font-size: 14px;">Add your first item above!</p>
         </div>'''
 
-    render_id = uuid.uuid4().hex[:8]
     return f'''<div id="list-render-{render_id}" style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;">{items_html}</div>'''
 
 def generate_parsed_items_html(items):
@@ -575,6 +576,21 @@ input[type="checkbox"]:checked::after {
     font-size: 14px;
     top: 50%;
     left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.fake-checkbox {
+    width: 22px; height: 22px; min-width: 22px;
+    border: 2px solid #ccc; border-radius: 6px;
+    cursor: pointer; margin-right: 14px; flex-shrink: 0;
+    position: relative; box-sizing: border-box;
+}
+.fake-checkbox.checked {
+    background: #0097A7; border-color: #0097A7;
+}
+.fake-checkbox.checked::after {
+    content: '\2713'; position: absolute; color: white;
+    font-size: 14px; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
 }
 
@@ -868,7 +884,7 @@ function deleteList(id) {
 function deleteCompleted() {
     if (confirm('Delete all completed items?')) {
         console.log('deleteCompleted called');
-        clickGradioButton('delete-completed-btn');
+        setTimeout(() => clickGradioButton('delete-completed-btn'), 200);
     }
 }
 
