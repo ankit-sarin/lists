@@ -348,30 +348,31 @@ def generate_single_list_html(list_info, items):
     for item in unpurchased:
         items_html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid #f0f0f0;">
-            <input type="checkbox" id="item-{item['id']}" onchange="toggleItem({item['id']})"
-                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer; flex-shrink: 0;">
-            <label for="item-{item['id']}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item['name']}</label>
+            <button type="button" onclick="toggleItem({item['id']})" style="width: 22px; height: 22px; min-width: 22px; padding: 0; border: 2px solid #ccc; border-radius: 6px; background: white; cursor: pointer; margin-right: 14px; flex-shrink: 0; box-sizing: border-box;"></button>
+            <span style="flex: 1; color: #333; font-size: 16px;">{item['name']}</span>
             <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
         </div>'''
 
     if purchased:
-        items_html += f'''<div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f9f9f9;">
+        items_html += f'''<div style="display: flex; align-items: center; padding: 12px 16px; background: #f9f9f9;">
             <span style="color: #999; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Completed ({len(purchased)})</span>
-            <button onclick="deleteCompleted()"
-                style="background: none; border: 1px solid #ccc; color: #999; font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer;"
-                onmouseover="this.style.borderColor='#f44336'; this.style.color='#f44336'"
-                onmouseout="this.style.borderColor='#ccc'; this.style.color='#999'">
-                Clear all
-            </button>
         </div>'''
         for item in purchased:
             items_html += f'''
             <div style="display: flex; align-items: center; padding: 14px 16px; background: #fafafa; border-bottom: 1px solid #f0f0f0;">
-                <input type="checkbox" id="item-{item['id']}" checked onchange="toggleItem({item['id']})"
-                    style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer; flex-shrink: 0;">
-                <label for="item-{item['id']}" style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through; cursor: pointer;">{item['name']}</label>
+                <button type="button" onclick="toggleItem({item['id']})" style="width: 22px; height: 22px; min-width: 22px; padding: 0; border: 2px solid #0097A7; border-radius: 6px; background: #0097A7; cursor: pointer; margin-right: 14px; flex-shrink: 0; box-sizing: border-box; color: white; font-size: 14px; line-height: 18px; text-align: center;">✓</button>
+                <span style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through;">{item['name']}</span>
                 <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
             </div>'''
+        items_html += f'''
+        <div style="padding: 12px 16px; background: #fafafa;">
+            <button onclick="deleteCompleted()"
+                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 500; padding: 10px; border-radius: 8px; cursor: pointer;"
+                onmouseover="this.style.background='#ffebee'"
+                onmouseout="this.style.background='none'">
+                Clear all completed ({len(purchased)})
+            </button>
+        </div>'''
 
     if not items:
         items_html = '''
@@ -577,6 +578,7 @@ input[type="checkbox"]:checked::after {
     left: 50%;
     transform: translate(-50%, -50%);
 }
+
 
 .ai-input-area {
     background: white !important;
@@ -868,7 +870,7 @@ function deleteList(id) {
 function deleteCompleted() {
     if (confirm('Delete all completed items?')) {
         console.log('deleteCompleted called');
-        clickGradioButton('delete-completed-btn');
+        setTimeout(() => clickGradioButton('delete-completed-btn'), 200);
     }
 }
 
