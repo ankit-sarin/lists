@@ -345,6 +345,17 @@ def generate_single_list_html(list_info, items):
     unpurchased = [i for i in items if not i['purchased']]
     purchased = [i for i in items if i['purchased']]
 
+    if purchased:
+        items_html += f'''
+        <div style="padding: 8px 16px; background: #fff5f5; border-bottom: 2px solid #ffcdd2;">
+            <button onclick="deleteCompleted()"
+                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 600; padding: 10px; border-radius: 8px; cursor: pointer;"
+                onmouseover="this.style.background='#ffebee'"
+                onmouseout="this.style.background='none'">
+                Delete Checked ({len(purchased)})
+            </button>
+        </div>'''
+
     for item in unpurchased:
         items_html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid #f0f0f0;">
@@ -364,15 +375,6 @@ def generate_single_list_html(list_info, items):
                 <span style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through;">{item['name']}</span>
                 <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
             </div>'''
-        items_html += f'''
-        <div style="padding: 12px 16px; background: #fafafa;">
-            <button onclick="deleteCompleted()"
-                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 500; padding: 10px; border-radius: 8px; cursor: pointer;"
-                onmouseover="this.style.background='#ffebee'"
-                onmouseout="this.style.background='none'">
-                Clear all completed ({len(purchased)})
-            </button>
-        </div>'''
 
     if not items:
         items_html = '''
@@ -669,10 +671,12 @@ async def handle_toggle_item(item_id, list_id):
 async def handle_delete_item(item_id, list_id):
     if item_id and list_id:
         await delete_item(int(item_id))
+    # Always rebuild entire list from fresh DB query so Gradio never carries stale state
+    if list_id:
         list_info = await get_list_by_id(int(list_id))
         items = await get_list_items(int(list_id))
-        return generate_single_list_html(list_info, items)
-    return ""
+        return generate_single_list_html(list_info, items), ""
+    return "", ""
 
 async def handle_delete_completed(list_id):
     if list_id:
@@ -806,15 +810,10 @@ function clickGradioButton(elemId) {
         btn = container.querySelector('.gr-button');
     }
 
-    if (btn) {
-        console.log('Clicking button:', elemId);
-        btn.click();
-    } else {
-        // Fallback: click the container itself and dispatch a click event
-        console.log('No button found, clicking container directly:', elemId);
-        container.click();
-        container.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    }
+    // In Gradio 6, elem_id is on the <button> itself (no wrapper div),
+    // so querySelector('button') returns null. Use btn || container.
+    var target = btn || container;
+    target.click();
 }
 
 function setInputValue(elemId, value) {
@@ -1129,7 +1128,7 @@ def create_app():
         new_item_name.submit(fn=handle_add_item, inputs=[current_list_id, new_item_name], outputs=[single_list_html, new_item_name])
 
         toggle_trigger.click(fn=handle_toggle_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
-        delete_trigger.click(fn=handle_delete_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html])
+        delete_trigger.click(fn=handle_delete_item, inputs=[action_item_id, current_list_id], outputs=[single_list_html, action_item_id])
         delete_completed_trigger.click(fn=handle_delete_completed, inputs=[current_list_id], outputs=[single_list_html])
 
         # Bruno handlers
