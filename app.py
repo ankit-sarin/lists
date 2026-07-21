@@ -434,7 +434,8 @@ custom_css = """
 
 .main-header {
     background: linear-gradient(135deg, #0097A7 0%, #00838F 100%) !important;
-    padding: 16px 20px !important;
+    /* Safe-area inset so the header clears the notch/status bar in PWA standalone mode */
+    padding: calc(16px + env(safe-area-inset-top)) 20px 16px 20px !important;
     color: white !important;
     font-size: 22px !important;
     font-weight: 700 !important;
@@ -892,7 +893,7 @@ with open(_css_path, "r") as f:
     brand_css = f.read()
 
 def create_app():
-    with gr.Blocks(title="Lists", css=custom_css + brand_css) as app:
+    with gr.Blocks(title="Lists") as app:
         # State
         current_list_id = gr.State(None)
         current_view = gr.State("lists")  # lists, single, ai
@@ -1203,8 +1204,69 @@ def create_app():
 
     return app
 
+# ============== PWA (Stage 1: installable, standalone, brand icons) ==============
+# Gradio 6.5.1's auto-generated manifest cannot express theme_color/background_color/
+# short_name/maskable icons, so we serve a hand-authored manifest + icons as static
+# routes on a FastAPI app and inject the <link>/<meta> tags via the Blocks `head`.
+
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+_ICONS_DIR = os.path.join(_STATIC_DIR, "icons")
+
+PWA_MANIFEST = {
+    "name": "Lists",
+    "short_name": "Lists",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "theme_color": "#0A5E56",       # Forest Teal
+    "background_color": "#EEF5F4",  # Mist White
+    "icons": [
+        {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+}
+
+PWA_HEAD = (
+    '<link rel="manifest" href="/manifest.json">'
+    '<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">'
+    '<meta name="theme-color" content="#0A5E56">'
+    '<meta name="mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+    '<meta name="apple-mobile-web-app-title" content="Lists">'
+)
+
 # ============== Main ==============
 if __name__ == "__main__":
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    from fastapi.staticfiles import StaticFiles
+
     asyncio.run(init_db())
-    app = create_app()
-    app.launch(server_port=7862, server_name="0.0.0.0", share=False, show_error=True, js=app_js)
+
+    fastapi_app = FastAPI()
+
+    # Register PWA routes BEFORE mounting Gradio at "/" so they take precedence
+    # (Gradio's own /manifest.json is otherwise shadowed by the "/" mount).
+    @fastapi_app.get("/manifest.json")
+    def _manifest():
+        return JSONResponse(PWA_MANIFEST, media_type="application/manifest+json")
+
+    fastapi_app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    demo = create_app()
+    fastapi_app = gr.mount_gradio_app(
+        fastapi_app,
+        demo,
+        path="/",
+        css=custom_css + brand_css,
+        js=app_js,
+        head=PWA_HEAD,
+        favicon_path=os.path.join(_ICONS_DIR, "icon-192.png"),
+        allowed_paths=[_STATIC_DIR],
+        show_error=True,
+    )
+
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=7862)
