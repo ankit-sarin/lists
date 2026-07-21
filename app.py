@@ -306,13 +306,13 @@ def generate_all_lists_html(lists, items_dict):
 
         for item in unpurchased[:4]:
             preview_html += f'''<div style="display: flex; align-items: center; padding: 3px 0; color: #555; font-size: 14px;">
-                <span style="color: #0097A7; margin-right: 8px; font-size: 8px;">●</span>
+                <span style="color: #0A5E56; margin-right: 8px; font-size: 8px;">●</span>
                 <span>{item['name']}</span>
             </div>'''
 
         remaining = len(unpurchased) - 4
         if remaining > 0:
-            preview_html += f'<div style="color: #0097A7; font-size: 13px; padding-top: 4px;">+ {remaining} more items</div>'
+            preview_html += f'<div style="color: #0A5E56; font-size: 13px; padding-top: 4px;">+ {remaining} more items</div>'
 
         if not unpurchased:
             if items:
@@ -325,9 +325,9 @@ def generate_all_lists_html(lists, items_dict):
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #f0f0f0;">
                 <div style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;" onclick="selectList({list_id})">
                     <span style="font-size: 20px;">{icon}</span>
-                    <span style="color: #0097A7; font-size: 17px; font-weight: 600;">{list_name}</span>
+                    <span style="color: #0A5E56; font-size: 17px; font-weight: 600;">{list_name}</span>
                 </div>
-                <button onclick="deleteList({list_id})" style="background: none; border: none; color: #999; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#999'">×</button>
+                <button onclick="deleteList({list_id})" aria-label="Delete list" style="width: 44px; height: 44px; min-width: 44px; margin: -11px -11px -11px 8px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: #999; font-size: 20px; cursor: pointer; border-radius: 4px; flex-shrink: 0;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#999'">×</button>
             </div>
             <div style="padding: 12px 16px; cursor: pointer;" onclick="selectList({list_id})">
                 {preview_html}
@@ -349,7 +349,7 @@ def generate_single_list_html(list_info, items):
         items_html += f'''
         <div style="padding: 8px 16px; background: #fff5f5; border-bottom: 2px solid #ffcdd2;">
             <button onclick="deleteCompleted()"
-                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 600; padding: 10px; border-radius: 8px; cursor: pointer;"
+                style="width: 100%; background: none; border: 1px solid #e57373; color: #e57373; font-size: 14px; font-weight: 600; padding: 14px; border-radius: 8px; cursor: pointer; min-height: 44px;"
                 onmouseover="this.style.background='#ffebee'"
                 onmouseout="this.style.background='none'">
                 Delete Checked ({len(purchased)})
@@ -359,9 +359,9 @@ def generate_single_list_html(list_info, items):
     for item in unpurchased:
         items_html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid #f0f0f0;">
-            <button type="button" onclick="toggleItem({item['id']})" style="width: 22px; height: 22px; min-width: 22px; padding: 0; border: 2px solid #ccc; border-radius: 6px; background: white; cursor: pointer; margin-right: 14px; flex-shrink: 0; box-sizing: border-box;"></button>
+            <button type="button" onclick="toggleItem({item['id']})" aria-label="Toggle item" style="width: 44px; height: 44px; min-width: 44px; margin: -11px 3px -11px -11px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; flex-shrink: 0; box-sizing: border-box;"><span style="width: 22px; height: 22px; border: 2px solid #ccc; border-radius: 6px; background: white; box-sizing: border-box; display: block;"></span></button>
             <span style="flex: 1; color: #333; font-size: 16px;">{item['name']}</span>
-            <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
+            <button onclick="deleteItem({item['id']})" aria-label="Delete item" style="width: 44px; height: 44px; min-width: 44px; margin: -11px -11px -11px 3px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: #ccc; font-size: 20px; cursor: pointer; flex-shrink: 0;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
         </div>'''
 
     if purchased:
@@ -371,9 +371,9 @@ def generate_single_list_html(list_info, items):
         for item in purchased:
             items_html += f'''
             <div style="display: flex; align-items: center; padding: 14px 16px; background: #fafafa; border-bottom: 1px solid #f0f0f0;">
-                <button type="button" onclick="toggleItem({item['id']})" style="width: 22px; height: 22px; min-width: 22px; padding: 0; border: 2px solid #0097A7; border-radius: 6px; background: #0097A7; cursor: pointer; margin-right: 14px; flex-shrink: 0; box-sizing: border-box; color: white; font-size: 14px; line-height: 18px; text-align: center;">✓</button>
+                <button type="button" onclick="toggleItem({item['id']})" aria-label="Toggle item" style="width: 44px; height: 44px; min-width: 44px; margin: -11px 3px -11px -11px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; flex-shrink: 0; box-sizing: border-box;"><span style="width: 22px; height: 22px; border: 2px solid #0A5E56; border-radius: 6px; background: #0A5E56; box-sizing: border-box; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; line-height: 1;">✓</span></button>
                 <span style="flex: 1; color: #999; font-size: 16px; text-decoration: line-through;">{item['name']}</span>
-                <button onclick="deleteItem({item['id']})" style="background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
+                <button onclick="deleteItem({item['id']})" aria-label="Delete item" style="width: 44px; height: 44px; min-width: 44px; margin: -11px -11px -11px 3px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; color: #ccc; font-size: 20px; cursor: pointer; flex-shrink: 0;" onmouseover="this.style.color='#f44336'" onmouseout="this.style.color='#ccc'">×</button>
             </div>'''
 
     if not items:
@@ -396,7 +396,7 @@ def generate_parsed_items_html(items):
         html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f0f0;">
             <input type="checkbox" id="parsed-{i}" checked class="parsed-item-cb" data-item="{item}"
-                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer;">
+                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0A5E56; cursor: pointer;">
             <label for="parsed-{i}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item}</label>
         </div>'''
     html += '</div>'
@@ -412,7 +412,7 @@ def generate_scanned_items_html(items):
         html += f'''
         <div style="display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f0f0f0;">
             <input type="checkbox" id="scanned-{i}" checked class="scanned-item-cb" data-item="{item}"
-                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0097A7; cursor: pointer;">
+                style="width: 22px; height: 22px; margin-right: 14px; accent-color: #0A5E56; cursor: pointer;">
             <label for="scanned-{i}" style="flex: 1; color: #333; font-size: 16px; cursor: pointer;">{item}</label>
         </div>'''
     html += '</div>'
@@ -433,7 +433,7 @@ custom_css = """
 }
 
 .main-header {
-    background: linear-gradient(135deg, #0097A7 0%, #00838F 100%) !important;
+    background: #0A5E56 !important;
     /* Safe-area inset so the header clears the notch/status bar in PWA standalone mode */
     padding: calc(16px + env(safe-area-inset-top)) 20px 16px 20px !important;
     color: white !important;
@@ -477,8 +477,8 @@ custom_css = """
     transition: all 0.2s !important;
 }
 
-.nav-tab:hover { color: #0097A7 !important; }
-.nav-tab.active { color: #0097A7 !important; border-bottom-color: #0097A7 !important; }
+.nav-tab:hover { color: #0A5E56 !important; }
+.nav-tab.active { color: #0A5E56 !important; border-bottom-color: #0A5E56 !important; }
 
 .filter-pills {
     display: flex !important;
@@ -491,19 +491,19 @@ custom_css = """
 .filter-pill {
     padding: 8px 16px !important;
     border-radius: 20px !important;
-    border: 2px solid #0097A7 !important;
+    border: 2px solid #0A5E56 !important;
     background: white !important;
-    color: #0097A7 !important;
+    color: #0A5E56 !important;
     font-size: 14px !important;
     font-weight: 500 !important;
     cursor: pointer !important;
     white-space: nowrap !important;
 }
 
-.filter-pill:hover, .filter-pill.active { background: #0097A7 !important; color: white !important; }
+.filter-pill:hover, .filter-pill.active { background: #0A5E56 !important; color: white !important; }
 
 .action-btn {
-    background: linear-gradient(135deg, #0097A7 0%, #00838F 100%) !important;
+    background: #0A5E56 !important;
     color: white !important;
     border: none !important;
     border-radius: 10px !important;
@@ -517,17 +517,17 @@ custom_css = """
 
 .action-btn:hover {
     transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(0, 151, 167, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(10, 94, 86, 0.3) !important;
 }
 
 .secondary-btn {
     background: white !important;
-    color: #0097A7 !important;
-    border: 2px solid #0097A7 !important;
+    color: #0A5E56 !important;
+    border: 2px solid #0A5E56 !important;
 }
 
 .secondary-btn:hover {
-    background: #e0f7fa !important;
+    background: #DFF0ED !important;
 }
 
 input[type="text"], textarea {
@@ -538,7 +538,7 @@ input[type="text"], textarea {
 }
 
 input[type="text"]:focus, textarea:focus {
-    border-color: #0097A7 !important;
+    border-color: #0A5E56 !important;
     outline: none !important;
 }
 
@@ -568,8 +568,8 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:checked {
-    background: #0097A7;
-    border-color: #0097A7;
+    background: #0A5E56;
+    border-color: #0A5E56;
 }
 
 input[type="checkbox"]:checked::after {
@@ -945,7 +945,7 @@ def create_app():
         with gr.Column(visible=False) as ai_helper_view:
             gr.HTML('''
             <div class="ai-input-area">
-                <h3 style="color: #0097A7; margin: 0 0 8px 0;">🤖 Bruno</h3>
+                <h3 style="color: #0A5E56; margin: 0 0 8px 0;">🤖 Bruno</h3>
                 <p style="color: #666; font-size: 14px; margin: 0;">
                     Type or paste your messy shopping list and let AI extract the items for you!
                 </p>
@@ -990,7 +990,7 @@ def create_app():
         with gr.Column(visible=False) as smart_scan_view:
             gr.HTML('''
             <div class="ai-input-area">
-                <h3 style="color: #0097A7; margin: 0 0 8px 0;">📷 Smart Scan</h3>
+                <h3 style="color: #0A5E56; margin: 0 0 8px 0;">📷 Smart Scan</h3>
                 <p style="color: #666; font-size: 14px; margin: 0;">
                     Upload a photo of a recipe, handwritten note, whiteboard, or screenshot and extract items automatically!
                 </p>
