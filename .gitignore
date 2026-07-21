@@ -4,3 +4,4 @@ __pycache__/
 grocery.db
 lists.db
 *.log
+primer.md
